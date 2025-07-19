@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commerce Booster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700&family=PT+Sans&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-color: #000000; --sidebar-bg: #111111; --chat-bg: #000000;
+            --text-color: #ffffff; --text-muted: #9ca3af; --border-color: #374151;
+            --bubble-user-bg: #2d2d2d; --bubble-ai-bg: #1a1a1a; --input-bg: #1f2937;
+            --accent-color: #3b82f6; --accent-hover: #2563eb;
+        }
+        [data-theme="light"] {
+            --bg-color: #f3f4f6; --sidebar-bg: #ffffff; --chat-bg: #f9fafb;
+            --text-color: #111827; --text-muted: #6b7281; --border-color: #d1d5db;
+            --bubble-user-bg: #dbeafe; --bubble-ai-bg: #e5e7eb; --input-bg: #ffffff;
+        }
+        body {
+            font-family: 'PT Sans', sans-serif;
+            background-color: var(--bg-color); color: var(--text-color);
+            height: 100vh; overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        #splash-screen {
+            background-color: #000000; z-index: 100;
+            transition: opacity 0.5s ease-out;
+        }
+        .sidebar { background-color: var(--sidebar-bg); border-right: 1px solid var(--border-color); }
+        .chat-area { background-color: var(--chat-bg); }
+        .user-bubble { background-color: var(--bubble-user-bg); }
+        .ai-bubble { background-color: var(--bubble-ai-bg); }
+        .prose { color: var(--text-color); }
+        .main-content { border-top: 1px solid var(--border-color); }
+        textarea { background-color: var(--input-bg); border: 1px solid var(--border-color); }
+        .sidebar-item:hover, .chat-history-item:hover { background-color: var(--bubble-ai-bg); }
+        .chat-history-item.active { background-color: var(--accent-color) !important; color: white !important; }
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); position: fixed; z-index: 50; transition: transform 0.3s ease; }
+            .sidebar.open { transform: translateX(0); }
+            .overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); z-index: 40; }
+            .sidebar.open + .overlay { display: block; }
+        }
+    </style>
+</head>
+<body class="flex">
+    <!-- Splash Screen -->
+    <div id="splash-screen" class="fixed inset-0 flex flex-col items-center justify-center">
+        <div class="flex items-center space-x-3">
+            <i data-lucide="zap" class="w-12 h-12 text-blue-500 animate-pulse"></i>
+            <h1 class="text-4xl font-bold text-white" style="font-family: 'Poppins', sans-serif;">Commerce Booster</h1>
+        </div>
+        <p class="text-gray-400 mt-2">Your AI Commerce Assistant</p>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar fixed lg:relative flex flex-col w-72 shrink-0 h-full" id="sidebar">
+        <!-- Header -->
+        <div class="p-4 border-b border-gray-800">
+             <div class="flex items-center space-x-3 mb-4">
+                 <i data-lucide="zap" class="w-8 h-8 text-blue-500"></i>
+                 <h1 class="text-xl font-bold" style="font-family: 'Poppins', sans-serif;">Commerce Booster</h1>
+             </div>
+             <button id="newChatButton" class="w-full flex items-center justify-center p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+                <i data-lucide="plus" class="mr-2"></i>New Chat
+             </button>
+        </div>
+
+        <!-- Chat History -->
+        <div class="px-2 py-2 flex-grow overflow-y-auto">
+            <h2 class="px-2 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">History</h2>
+            <div id="chatHistory" class="space-y-1"></div>
+        </div>
+
+        <!-- Favorites & Liked -->
+        <div class="px-2 py-2 overflow-y-auto max-h-48">
+            <h2 class="px-2 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Favorites</h2>
+            <div id="savedItems" class="space-y-1"></div>
+            <h2 class="px-2 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mt-2">Liked</h2>
+            <div id="likedItems" class="space-y-1"></div>
+        </div>
+
+        <!-- Settings -->
+        <div class="px-4 py-3 border-t border-gray-800 mt-auto">
+            <div class="flex items-center justify-between">
+                <span class="text-sm">Theme</span>
+                <div class="flex items-center p-1 rounded-full bg-gray-700">
+                    <button id="lightModeBtn" class="p-1 rounded-full text-gray-400"><i data-lucide="sun" class="w-4 h-4"></i></button>
+                    <button id="darkModeBtn" class="p-1 rounded-full bg-blue-600 text-white"><i data-lucide="moon" class="w-4 h-4"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Overlay for mobile -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col h-screen overflow-hidden main-content">
+        <!-- Mobile Header -->
+        <div class="lg:hidden p-4 border-b border-gray-800 flex items-center">
+            <button id="openSidebar" class="p-1 rounded-md hover:bg-gray-700 mr-2"><i data-lucide="menu"></i></button>
+            <h2 class="text-lg font-bold" style="font-family: 'Poppins', sans-serif;" id="currentSubject">New Chat</h2>
+        </div>
+        <!-- Chat Area -->
+        <div class="chat-area flex-grow p-4 space-y-4 overflow-y-auto" id="chatArea"></div>
+
+        <!-- Input Area -->
+        <div class="p-4 border-t border-gray-800 shrink-0">
+            <div class="relative">
+                <textarea id="messageInput" class="w-full p-4 pr-24 rounded-lg bg-gray-800 text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500" rows="1" placeholder="Ask anything..."></textarea>
+                <div class="absolute right-3 bottom-3 flex items-center space-x-2">
+                    <button id="imageUploadBtn" class="p-2 rounded-lg hover:bg-gray-700 text-gray-400"><i data-lucide="image"></i></button>
+                    <button id="micBtn" class="p-2 rounded-lg hover:bg-gray-700 text-gray-400"><i data-lucide="mic"></i></button>
+                    <button id="sendButton" class="p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-500">
+                        <i data-lucide="send"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- ELEMENTS ---
+            const splashScreen = document.getElementById('splash-screen');
+            const sidebar = document.getElementById('sidebar');
+            const openSidebar = document.getElementById('openSidebar');
+            const overlay = document.getElementById('overlay');
+            const newChatButton = document.getElementById('newChatButton');
+            const chatArea = document.getElementById('chatArea');
+            const messageInput = document.getElementById('messageInput');
+            const sendButton = document.getElementById('sendButton');
+            const chatHistoryContainer = document.getElementById('chatHistory');
+            const savedItemsContainer = document.getElementById('savedItems');
+            const likedItemsContainer = document.getElementById('likedItems');
+            const lightModeBtn = document.getElementById('lightModeBtn');
+            const darkModeBtn = document.getElementById('darkModeBtn');
+            const currentSubject = document.getElementById('currentSubject');
+
+
+            // --- STATE MANAGEMENT ---
+            let state = {
+                currentChatId: null, // Track the ID of the current chat
+                chatHistory: [], // [{ id, title, messages: [] }]
+                savedItems: [],  // [{ id, question, answer }]
+                likedItems: [],  // [{ id, question, answer }]
+                theme: 'dark'
+            };
+
+            const saveState = () => {
+                localStorage.setItem('commerceBoosterState', JSON.stringify(state));
+            };
+
+            const loadState = () => {
+                const savedState = localStorage.getItem('commerceBoosterState');
+                if (savedState) {
+                    state = JSON.parse(savedState);
+                }
+            };
+            
+            // --- INITIALIZATION ---
+            loadState();
+            applyTheme();
+            renderChatHistory();
+            renderSavedAndLikedItems();
+            // Open the last active chat or a new one
+            if (state.currentChatId) {
+                openChat(state.currentChatId);
+            } else {
+                startNewChat();
+            }
+
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                splashScreen.style.opacity = '0';
+                setTimeout(() => splashScreen.style.display = 'none', 500);
+            }, 1500); // Shortened splash screen time
+            
+            // --- EVENT LISTENERS ---
+            openSidebar.addEventListener('click', () => sidebar.classList.add('open'));
+            overlay.addEventListener('click', () => sidebar.classList.remove('open'));
+            newChatButton.addEventListener('click', startNewChat);
+            sendButton.addEventListener('click', handleSendMessage);
+            messageInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                }
+            });
+            chatHistoryContainer.addEventListener('click', handleHistoryAction);
+            chatArea.addEventListener('click', handleChatAction);
+            lightModeBtn.addEventListener('click', () => switchTheme('light'));
+            darkModeBtn.addEventListener('click', () => switchTheme('dark'));
+
+            // Placeholder Buttons
+            document.getElementById('imageUploadBtn').addEventListener('click', () => showToast('Image upload (OCR) is not implemented.'));
+            document.getElementById('micBtn').addEventListener('click', () => showToast('Speech-to-text is not implemented.'));
+            
+            // --- FUNCTIONS ---
+            function startNewChat() {
+                state.currentChatId = null;
+                chatArea.innerHTML = `
+                    <div class="text-center text-gray-400 py-10">
+                        <div class="inline-block p-4 bg-gray-800 rounded-full">
+                           <i data-lucide="zap" class="w-10 h-10 text-blue-400"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold mt-4" style="font-family: 'Poppins', sans-serif;">Commerce Booster</h2>
+                        <p class="mt-2 text-gray-500">Ask a question to begin a new chat.</p>
+                    </div>`;
+                currentSubject.textContent = "New Chat";
+                renderChatHistory();
+                lucide.createIcons();
+            }
+            
+            function openChat(chatId) {
+                const chat = state.chatHistory.find(c => c.id === chatId);
+                if (!chat) {
+                    startNewChat(); // If chat not found, start a new one
+                    return;
+                }
+                state.currentChatId = chatId;
+                currentSubject.textContent = chat.title;
+                renderCurrentChat();
+                renderChatHistory(); // To update active highlight
+                sidebar.classList.remove('open'); // Close sidebar on mobile after selection
+            }
+
+            async function handleSendMessage() {
+                const messageText = messageInput.value.trim();
+                if (!messageText) return;
+
+                let currentChat;
+                const isNewChat = !state.currentChatId;
+
+                if (isNewChat) {
+                    // This is a new chat
+                    const newChatId = Date.now();
+                    const title = messageText.substring(0, 30);
+                    currentChat = { id: newChatId, title, messages: [] };
+                    state.chatHistory.unshift(currentChat);
+                    state.currentChatId = newChatId;
+                    currentSubject.textContent = title;
+                    chatArea.innerHTML = ''; // Clear welcome message
+                    renderChatHistory();
+                } else {
+                    currentChat = state.chatHistory.find(c => c.id === state.currentChatId);
+                }
+
+                const userMessage = { role: 'user', content: messageText, id: Date.now() };
+                currentChat.messages.push(userMessage);
+                
+                renderCurrentChat();
+                messageInput.value = '';
+                showThinkingIndicator();
+
+                await new Promise(resolve => setTimeout(resolve, 500)); // simulate thinking delay
+const aiResponseText = await getAiResponse(messageText);
+                const aiMessage = { role: 'ai', content: aiResponseText, id: Date.now() + 1 };
+                currentChat.messages.push(aiMessage);
+                
+                removeThinkingIndicator();
+                renderCurrentChat();
+                saveState();
+            }
+
+            function renderCurrentChat() {
+                chatArea.innerHTML = '';
+                const currentChat = state.chatHistory.find(c => c.id === state.currentChatId);
+                if (!currentChat) return;
+
+                currentChat.messages.forEach(msg => {
+                    const bubble = msg.role === 'user' ? createUserBubble(msg) : createAIBubble(msg, currentChat);
+                    chatArea.appendChild(bubble);
+                });
+                chatArea.scrollTop = chatArea.scrollHeight;
+                lucide.createIcons();
+            }
+            
+            function createUserBubble(msg) {
+                const div = document.createElement('div');
+                div.className = 'flex justify-end';
+                div.innerHTML = `<div class="user-bubble p-4 max-w-xl rounded-2xl rounded-br-none">
+                                     <p class="whitespace-pre-wrap">${msg.content}</p>
+                                 </div>`;
+                return div;
+            }
+
+            function createAIBubble(msg, chat) {
+                 const div = document.createElement('div');
+                div.className = 'flex';
+                // Find user message that prompted this AI response
+                const userMessageIndex = chat.messages.findIndex(m => m.id === msg.id) - 1;
+                const userMessage = chat.messages[userMessageIndex] || { content: '' };
+
+                div.innerHTML = `
+                    <div class="flex-shrink-0 mr-3">
+                        <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
+                             <i data-lucide="sparkles" class="w-5 h-5 text-blue-400"></i>
+                        </div>
+                    </div>
+                    <div class="ai-bubble p-4 max-w-xl rounded-2xl rounded-bl-none">
+                        <div class="prose prose-invert max-w-none text-white">${marked.parse(msg.content)}</div>
+                        <div class="flex items-center mt-3 space-x-4 text-sm text-gray-400" data-message-id="${msg.id}" data-user-question="${encodeURIComponent(userMessage.content)}">
+                            <button class="flex items-center hover:text-blue-400 action-btn" data-action="like">
+                                <i data-lucide="thumbs-up" class="mr-1 w-4 h-4"></i> Like
+                            </button>
+                            <button class="flex items-center hover:text-red-400 action-btn" data-action="dislike">
+                                <i data-lucide="thumbs-down" class="mr-1 w-4 h-4"></i> Dislike
+                            </button>
+                            <button class="flex items-center hover:text-green-400 action-btn" data-action="save">
+                                <i data-lucide="bookmark" class="mr-1 w-4 h-4"></i> Save
+                            </button>
+                        </div>
+                    </div>`;
+                return div;
+            }
+
+            function handleHistoryAction(e) {
+                const target = e.target;
+                const historyItem = target.closest('[data-chat-id]');
+                if (!historyItem) return;
+
+                const chatId = parseInt(historyItem.dataset.chatId);
+                
+                // Check if an action button was clicked
+                if (target.closest('[data-action]')) {
+                    const action = target.closest('[data-action]').dataset.action;
+                    if (action === 'rename') {
+                        handleRenameChat(chatId);
+                    } else if (action === 'delete') {
+                        handleDeleteChat(chatId);
+                    }
+                } else {
+                    // Otherwise, open the chat
+                    openChat(chatId);
+                }
+            }
+            
+            function handleRenameChat(chatId) {
+                 const chat = state.chatHistory.find(c => c.id === chatId);
+                 if(!chat) return;
+
+                 const newTitle = prompt("Enter a new name for the chat:", chat.title);
+                 if (newTitle && newTitle.trim() !== '') {
+                     chat.title = newTitle.trim();
+                     if (chatId === state.currentChatId) {
+                        currentSubject.textContent = chat.title;
+                     }
+                     saveState();
+                     renderChatHistory();
+                     showToast("Chat renamed!");
+                 }
+            }
+
+            function handleDeleteChat(chatId) {
+                const chatIndex = state.chatHistory.findIndex(c => c.id === chatId);
+                if(chatIndex === -1) return;
+
+                if(confirm(`Are you sure you want to delete "${state.chatHistory[chatIndex].title}"?`)) {
+                    state.chatHistory.splice(chatIndex, 1);
+                    // If the deleted chat was the active one, start a new chat
+                    if(state.currentChatId === chatId) {
+                        startNewChat();
+                    }
+                    saveState();
+                    renderChatHistory();
+                    showToast("Chat deleted.");
+                }
+            }
+
+
+            function handleChatAction(e) {
+                const button = e.target.closest('.action-btn');
+                if (!button) return;
+                
+                const container = button.parentElement;
+                const action = button.dataset.action;
+                const messageId = parseInt(container.dataset.messageId);
+                const aiMessageContent = button.closest('.ai-bubble').querySelector('.prose').innerHTML;
+                const userQuestion = decodeURIComponent(container.dataset.userQuestion);
+                
+                const item = { id: messageId, question: userQuestion, answer: aiMessageContent };
+                
+                if (action === 'like') {
+                    if (!state.likedItems.some(i => i.id === item.id)) {
+                        state.likedItems.unshift(item);
+                        showToast('Added to Liked');
+                    } else {
+                         state.likedItems = state.likedItems.filter(i => i.id !== item.id);
+                         showToast('Removed from Liked');
+                    }
+                } else if (action === 'save') {
+                     if (!state.savedItems.some(i => i.id === item.id)) {
+                        state.savedItems.unshift(item);
+                        showToast('Added to Favorites');
+                    } else {
+                         state.savedItems = state.savedItems.filter(i => i.id !== item.id);
+                         showToast('Removed from Favorites');
+                    }
+                } else if(action === 'dislike'){
+                    showToast('Thanks for your feedback!');
+                }
+
+                saveState();
+                renderSavedAndLikedItems();
+            }
+
+            function renderSavedAndLikedItems() {
+                savedItemsContainer.innerHTML = state.savedItems.map(item => createSidebarItem(item, "favorite")).join('');
+                likedItemsContainer.innerHTML = state.likedItems.map(item => createSidebarItem(item, "liked")).join('');
+                lucide.createIcons();
+            }
+            
+            function createSidebarItem(item, type){
+                const title = item.question.substring(0, 25) + '...';
+                return `<a href="#" class="block p-2 rounded-lg text-sm truncate" title="${item.question}">${title}</a>`;
+            }
+            
+            function renderChatHistory() {
+                chatHistoryContainer.innerHTML = state.chatHistory.map(chat => `
+                    <div class="relative group" data-chat-id="${chat.id}">
+                        <a href="#" class="block w-full text-left p-2 pr-8 rounded-lg text-sm truncate chat-history-item ${chat.id === state.currentChatId ? 'active' : ''}">
+                            ${chat.title}
+                        </a>
+                        <div class="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex bg-gray-600 rounded-md">
+                           <button data-action="rename" title="Rename" class="p-1 hover:text-blue-400"><i data-lucide="file-pen-line" class="w-4 h-4 pointer-events-none"></i></button>
+                           <button data-action="delete" title="Delete" class="p-1 hover:text-red-400"><i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i></button>
+                        </div>
+                    </div>
+                `).join('');
+                lucide.createIcons();
+            }
+            
+            function showThinkingIndicator() {
+                if(document.getElementById('thinking-indicator')) return; // Prevent multiple indicators
+                const indicator = `
+                    <div id="thinking-indicator" class="flex">
+                        <div class="flex-shrink-0 mr-3">
+                           <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
+                               <i data-lucide="sparkles" class="w-5 h-5 text-blue-400"></i>
+                           </div>
+                        </div>
+                        <div class="ai-bubble p-4 rounded-2xl rounded-bl-none">
+                            <span class="font-medium animate-pulse">Thinking...</span>
+                        </div>
+                    </div>`;
+                chatArea.insertAdjacentHTML('beforeend', indicator);
+                chatArea.scrollTop = chatArea.scrollHeight;
+                lucide.createIcons();
+            }
+
+            function removeThinkingIndicator() {
+                document.getElementById('thinking-indicator')?.remove();
+            }
+            
+            // --- THEME ---
+            function switchTheme(theme) {
+                state.theme = theme;
+                applyTheme();
+                saveState();
+            }
+            function applyTheme() {
+                document.documentElement.setAttribute('data-theme', state.theme);
+                if (state.theme === 'light') {
+                    lightModeBtn.classList.add('bg-blue-600', 'text-white');
+                    darkModeBtn.classList.remove('bg-blue-600', 'text-white');
+                } else {
+                    darkModeBtn.classList.add('bg-blue-600', 'text-white');
+                    lightModeBtn.classList.remove('bg-blue-600', 'text-white');
+                }
+            }
+
+            // --- UTILITIES ---
+            function showToast(message) {
+                document.querySelectorAll('.toast').forEach(t => t.remove());
+                const toast = document.createElement('div');
+                toast.className = 'toast fixed bottom-5 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
+
+// 🧠 Chat memory
+let history = [];
+
+async function getAiResponse(userInput) {
+  history.push({ role: 'user', content: userInput });
+
+  try {
+    const response = await fetch('/ask-gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: userInput,
+        history: history
+      })
+    });
+
+    const data = await response.json();
+    const aiReply = data.answer || "No response from Commerce Booster.";
+
+    history.push({ role: 'model', content: aiReply });
+    return aiReply;
+
+  } catch (err) {
+    console.error("❌ Error calling backend:", err);
+    return "Failed to connect to backend.";
+  }
+}
+
+
+        });
+    </script>
+</body>
+</html>
